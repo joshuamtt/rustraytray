@@ -1,0 +1,1 @@
+/home/jt/projects/rust/rustraytray/target/debug/rustraytray: /home/jt/projects/rust/rustraytray/src/lib.rs /home/jt/projects/rust/rustraytray/src/main.rs /home/jt/projects/rust/rustraytray/src/matrices.rs /home/jt/projects/rust/rustraytray/src/porvmath.rs
