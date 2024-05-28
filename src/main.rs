@@ -8,8 +8,10 @@ use crate::porvmath::porv_math::*;
 mod matrices;
 mod porvmath;
 
-use std::{io::Write, vec};
 const EPSILON: f32 = 0.0001; // Used for comparing floats
+
+use std::{io::Write, vec};
+use rand::{random, Rng};
 
 struct Projectile {
     position: PorvTuple, // POINT
@@ -37,6 +39,18 @@ struct Canvas {
 struct Ray {
     origin: PorvTuple,    // POINT!
     direction: PorvTuple, // VECTOR!
+}
+
+struct Intersection<T> {
+  t_value: f32,
+  object: T
+}
+
+struct Sphere {
+  // Sphere ID?????
+	sphere_id: u32, // Random number.
+	// position: PorvTuple, // POINT!
+
 }
 
 fn main() {
@@ -172,6 +186,33 @@ impl Ray {
     pub fn position(ray: Ray, t: f32) -> PorvTuple {
         return ray.origin + t * ray.direction;
     }
+    // Returns the collection of "t" values where ray intersects sphere.
+   pub fn intersect(sphere: Sphere, ray: Ray) -> Vec<f32> {
+      // Should only intersect, 2 times or is tangential (intersects at one point), or doesn't at all
+      //
+      //  for 2 intersections, count will be 2, and points will be there respectively.
+      //  for 1, count = 2, and the point will be the same.
+      //  for 0, count = 0
+			let mut t_values: Vec<f32> = vec![] ;
+			let sphere_to_ray = ray.origin - PorvTuple::point(0.0, 0.0, 0.0);
+			let a = PorvTuple::dot(ray.direction, ray.direction);
+			let b = 2.0 * PorvTuple::dot(ray.direction, sphere_to_ray);
+			let c = PorvTuple::dot(sphere_to_ray, sphere_to_ray) - 1.0;
+
+			let discriminant = (b * b) - 4.0 * a * c;
+
+			if discriminant < 0.0 { // The ray misses the sphere.
+  			return t_values;
+			}
+
+			let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
+			let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
+
+			t_values[0] = t1;
+			t_values[1] = t2;
+
+			t_values
+    }
 }
 
 impl std::ops::Add for Color {
@@ -213,7 +254,7 @@ impl std::ops::Mul<Color> for f32 {
 impl Canvas {
     /*
     (y)
-     |
+    |------------------
     |------------------
     |------------------
     |------------------
@@ -267,3 +308,14 @@ impl Canvas {
         Ok(())
     }
 }
+
+impl Sphere {
+  fn new() -> Sphere {
+    Sphere {
+      sphere_id: random(),
+    }
+  }
+
+}
+
+
