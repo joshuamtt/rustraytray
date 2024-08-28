@@ -1,1 +1,1 @@
-/home/jt/projects/rust/rustraytray/target/debug/librustraytray.rlib: /home/jt/projects/rust/rustraytray/src/lib.rs
+/home/joshuat/projects/rustraytray/target/debug/librustraytray.rlib: /home/joshuat/projects/rustraytray/src/lib.rs

@@ -77,6 +77,10 @@ pub mod porv_math {
                 w: VECTOR,
             }
         }
+        pub fn reflect(in_vec: PorvTuple, normal_vec: PorvTuple) -> PorvTuple {
+            // TODO: look into fixing the position of the number multiplying the vector.
+            return in_vec - PorvTuple::dot(in_vec, normal_vec) * (2.0 * normal_vec);
+        }
     }
     impl std::ops::Add for PorvTuple {
         type Output = PorvTuple;

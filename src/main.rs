@@ -10,8 +10,9 @@ mod porvmath;
 
 const EPSILON: f32 = 0.0001; // Used for comparing floats
 
-use std::{io::Write, vec};
+use porvmath::porv_math;
 use rand::{random, Rng};
+use std::{io::Write, vec};
 
 struct Projectile {
     position: PorvTuple, // POINT
@@ -42,15 +43,29 @@ struct Ray {
 }
 
 struct Intersection<T> {
-  t_value: f32,
-  object: T
+    t_value: f32,
+    object: T,
 }
 
 struct Sphere {
-  // Sphere ID?????
-	sphere_id: u32, // Random number.
-	// position: PorvTuple, // POINT!
+    // Sphere ID?????
+    sphere_id: u32, // Random number.
+    // position: PorvTuple, // POINT!
+    transform: Matrix,
+    material: Material,
+}
 
+struct PointLight {
+    position: PorvTuple,
+    intensity: Color,
+}
+
+struct Material {
+    color: Color,
+    ambient: f32,
+    diffuse: f32,
+    specular: f32,
+    shininess: f32,
 }
 
 fn main() {
@@ -187,31 +202,40 @@ impl Ray {
         return ray.origin + t * ray.direction;
     }
     // Returns the collection of "t" values where ray intersects sphere.
-   pub fn intersect(sphere: Sphere, ray: Ray) -> Vec<f32> {
-      // Should only intersect, 2 times or is tangential (intersects at one point), or doesn't at all
-      //
-      //  for 2 intersections, count will be 2, and points will be there respectively.
-      //  for 1, count = 2, and the point will be the same.
-      //  for 0, count = 0
-			let mut t_values: Vec<f32> = vec![] ;
-			let sphere_to_ray = ray.origin - PorvTuple::point(0.0, 0.0, 0.0);
-			let a = PorvTuple::dot(ray.direction, ray.direction);
-			let b = 2.0 * PorvTuple::dot(ray.direction, sphere_to_ray);
-			let c = PorvTuple::dot(sphere_to_ray, sphere_to_ray) - 1.0;
+    pub fn intersect(sphere: Sphere, ray: Ray) -> Vec<f32> {
+        // Should only intersect, 2 times or is tangential (intersects at one point), or doesn't at all
+        //
+        //  for 2 intersections, count will be 2, and points will be there respectively.
+        //  for 1, count = 2, and the point will be the same.
+        //  for 0, count = 0
+        let mut t_values: Vec<f32> = vec![];
+        let sphere_to_ray = ray.origin - PorvTuple::point(0.0, 0.0, 0.0);
+        let a = PorvTuple::dot(ray.direction, ray.direction);
+        let b = 2.0 * PorvTuple::dot(ray.direction, sphere_to_ray);
+        let c = PorvTuple::dot(sphere_to_ray, sphere_to_ray) - 1.0;
 
-			let discriminant = (b * b) - 4.0 * a * c;
+        let discriminant = (b * b) - 4.0 * a * c;
 
-			if discriminant < 0.0 { // The ray misses the sphere.
-  			return t_values;
-			}
+        if discriminant < 0.0 {
+            // The ray misses the sphere.
+            return t_values;
+        }
 
-			let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
-			let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
+        let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
+        let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
 
-			t_values[0] = t1;
-			t_values[1] = t2;
+        t_values[0] = t1;
+        t_values[1] = t2;
 
-			t_values
+        t_values
+    }
+
+    pub fn transform(ray: Ray, translation_matrix: Matrix) -> Ray {
+        Ray {
+            // TODO: Do something about this .clone stuff: should be fine for now though.
+            direction: translation_matrix.clone() * ray.direction,
+            origin: translation_matrix.clone() * ray.origin,
+        }
     }
 }
 
@@ -309,13 +333,53 @@ impl Canvas {
     }
 }
 
-impl Sphere {
-  fn new() -> Sphere {
-    Sphere {
-      sphere_id: random(),
+impl PointLight {
+    fn point_light(position: PorvTuple, intensity: Color) -> PointLight {
+        PointLight {
+            position,
+            intensity,
+        }
     }
-  }
-
 }
 
+impl Material {
+    pub fn new(
+        color: Color,
+        ambient: f32,
+        diffuse: f32,
+        specular: f32,
+        shininess: f32,
+    ) -> Material {
+        Material {
+            color,
+            ambient,
+            diffuse,
+            specular,
+            shininess,
+        }
+    }
+}
 
+impl Sphere {
+    fn new(material: Material) -> Sphere {
+        Sphere {
+            sphere_id: random(),
+            transform: Matrix::identity_matrix(),
+            material,
+        }
+    }
+    // Assumes that the point will always be on the surface of the sphere.
+    fn normal_at(sphere: Sphere, world_point: &mut PorvTuple) {
+        let object_point = Matrix::inverse(&sphere.transform) * *world_point;
+        let object_normal = object_point - PorvTuple::point(0.0, 0.0, 0.0);
+        let mut world_normal =
+            Matrix::transpose(&Matrix::inverse(&sphere.transform)) * object_normal;
+        world_normal.w = 0.0;
+        // why do i have to pass it as &mut when I declared as mut?
+        return PorvTuple::normalize(&mut world_normal);
+    }
+
+    fn set_transform(sphere: &mut Sphere, transform: Matrix) {
+        sphere.transform = transform;
+    }
+}
