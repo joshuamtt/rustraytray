@@ -1,3 +1,6 @@
+// TODOs
+// TODO:
+
 #![allow(dead_code)]
 #![allow(unused_mut)]
 #![allow(unused_variables)]
@@ -101,10 +104,57 @@ fn main() {
     }
     let _ = Canvas::canvas_to_p3_ppm(canvas, String::from("output.ppm")).unwrap();
     */
+    let ray_org = PorvTuple::point(0.0, 0.0, -5.0);
+    let canvas_pixels = 100.0;
+    let wall_size = 7.0;
+    let pixel_size = wall_size / canvas_pixels;
+    let half = wall_size / 2.0;
+    let wall_z = 10;
 
-    // This program will create a clock face with pixels where the hours are.
+    let mut canvas = Canvas::new(
+        canvas_pixels as usize,
+        canvas_pixels as usize,
+        Color::new(0.0, 0.0, 0.0),
+    );
 
-    // println!("{}", test == A);
+    let sphere_mat = Material::new(Color::new(10.0, 0.0, 0.0), 0.65, 0.8, 0.7, 150.0);
+    let light_position = PorvTuple::point(-10.0, 10.0, -10.0);
+    let light_color = Color::new(1.0, 1.0, 1.0);
+
+    let light = PointLight::new(light_position, light_color);
+
+    let mut sphere = Sphere::new(sphere_mat);
+
+    // let color = Color::new(1.0, 0.0, 0.0);
+
+    for i in 0..canvas_pixels as i32 - 1 {
+        let world_y = half - pixel_size * i as f32;
+        for j in 0..canvas_pixels as i32 - 1 {
+            let world_x = -half + pixel_size * j as f32;
+
+            let pos = PorvTuple::point(world_x, world_y, wall_z as f32);
+            let mut vect: PorvTuple = pos - ray_org;
+            PorvTuple::normalize(&mut vect);
+            let mut r = Ray::new(ray_org, vect);
+
+            PorvTuple::normalize(&mut r.direction); // ## Should Normalize mutate, or return?
+
+            let xs = Ray::intersect(&sphere, &r);
+
+            if xs.len() != 0 {
+                // We have a hit
+                let mut point = Ray::position(&r, xs[0]);
+                let normal: PorvTuple = Sphere::normal_at(&sphere, &mut point);
+                let eye = -r.direction;
+
+                let color = lighting(&sphere.material, point, &light, eye, normal);
+
+                let _ = Canvas::write_pixel(&mut canvas, i as usize, j as usize, color);
+            }
+        }
+    }
+
+    let _ = Canvas::canvas_to_p3_ppm(canvas, String::from("output.ppm")).unwrap();
 }
 
 fn tick(environment: Environment, projectile: Projectile) -> Projectile {
@@ -198,11 +248,11 @@ impl Ray {
         }
         Ray { origin, direction }
     }
-    pub fn position(ray: Ray, t: f32) -> PorvTuple {
+    pub fn position(ray: &Ray, t: f32) -> PorvTuple {
         return ray.origin + t * ray.direction;
     }
     // Returns the collection of "t" values where ray intersects sphere.
-    pub fn intersect(sphere: Sphere, ray: Ray) -> Vec<f32> {
+    pub fn intersect(sphere: &Sphere, ray: &Ray) -> Vec<f32> {
         // Should only intersect, 2 times or is tangential (intersects at one point), or doesn't at all
         //
         //  for 2 intersections, count will be 2, and points will be there respectively.
@@ -224,8 +274,8 @@ impl Ray {
         let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
         let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
 
-        t_values[0] = t1;
-        t_values[1] = t2;
+        t_values.push(t1);
+        t_values.push(t2);
 
         t_values
     }
@@ -273,6 +323,48 @@ impl std::ops::Mul<Color> for f32 {
             b: self * c2.b,
         }
     }
+}
+// eye and normal vectors are from phong reflection model.
+fn lighting(
+    material: &Material,
+    illuminated_point: PorvTuple,
+    light_source: &PointLight,
+    eye_vector: PorvTuple,
+    normal_vector: PorvTuple,
+) -> Color {
+    let effective_color = material.ambient * material.color;
+
+    let mut light_vector = light_source.position - illuminated_point;
+
+    PorvTuple::normalize(&mut light_vector);
+
+    let ambient = material.ambient * effective_color;
+
+    let light_dot_norm = PorvTuple::dot(light_vector, normal_vector);
+
+    let mut diffuse: Color;
+    let mut specular: Color;
+
+    if light_dot_norm < 0.0 {
+        diffuse = Color::new(0.0, 0.0, 0.0);
+        specular = Color::new(0.0, 0.0, 0.0);
+    } else {
+        diffuse = material.diffuse * light_dot_norm * effective_color;
+
+        let reflect_vector = PorvTuple::reflect(-light_vector, normal_vector);
+        let reflect_dot_eye = PorvTuple::dot(reflect_vector, eye_vector);
+
+        if reflect_dot_eye <= 0.0 {
+            // specular = black
+            specular = Color::new(0.0, 0.0, 0.0);
+        } else {
+            // let factor = powf32(reflect_dot_eye, material.shininess);
+            let factor = reflect_dot_eye.powf(material.shininess);
+            specular = material.specular * factor * light_source.intensity;
+        }
+    }
+
+    return ambient + diffuse + specular;
 }
 
 impl Canvas {
@@ -334,7 +426,7 @@ impl Canvas {
 }
 
 impl PointLight {
-    fn point_light(position: PorvTuple, intensity: Color) -> PointLight {
+    fn new(position: PorvTuple, intensity: Color) -> PointLight {
         PointLight {
             position,
             intensity,
@@ -369,14 +461,15 @@ impl Sphere {
         }
     }
     // Assumes that the point will always be on the surface of the sphere.
-    fn normal_at(sphere: Sphere, world_point: &mut PorvTuple) {
+    fn normal_at(sphere: &Sphere, world_point: &mut PorvTuple) -> PorvTuple {
         let object_point = Matrix::inverse(&sphere.transform) * *world_point;
         let object_normal = object_point - PorvTuple::point(0.0, 0.0, 0.0);
         let mut world_normal =
             Matrix::transpose(&Matrix::inverse(&sphere.transform)) * object_normal;
         world_normal.w = 0.0;
         // why do i have to pass it as &mut when I declared as mut?
-        return PorvTuple::normalize(&mut world_normal);
+        PorvTuple::normalize(&mut world_normal);
+        return world_normal;
     }
 
     fn set_transform(sphere: &mut Sphere, transform: Matrix) {

@@ -141,7 +141,6 @@ pub mod matrix {
             let mut inverted_matrix = Matrix::new(matrix.array.len(), 0.0);
 
             let determinant = Matrix::determinant(matrix);
-            println!("{}", determinant);
 
             if !(Matrix::invertible(matrix)) {
                 panic!("Not invertible.");
